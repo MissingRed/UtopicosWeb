@@ -100,166 +100,178 @@ require_once 'HTTP/Request2/Response.php';
  */
 class HTTP_Request2_Observer_UncompressingDownload implements SplObserver
 {
-    /**
-     * The stream to write response body to
-     * @var resource
-     */
-    private $_stream;
+  /**
+   * The stream to write response body to
+   * @var resource
+   */
+  private $_stream;
 
-    /**
-     * zlib.inflate filter possibly added to stream
-     * @var resource
-     */
-    private $_streamFilter;
+  /**
+   * zlib.inflate filter possibly added to stream
+   * @var resource
+   */
+  private $_streamFilter;
 
-    /**
-     * The value of response's Content-Encoding header
-     * @var string
-     */
-    private $_encoding;
+  /**
+   * The value of response's Content-Encoding header
+   * @var string
+   */
+  private $_encoding;
 
-    /**
-     * Whether the observer is still waiting for gzip/deflate header
-     * @var bool
-     */
-    private $_processingHeader = true;
+  /**
+   * Whether the observer is still waiting for gzip/deflate header
+   * @var bool
+   */
+  private $_processingHeader = true;
 
-    /**
-     * Starting position in the stream observer writes to
-     * @var int
-     */
-    private $_startPosition = 0;
+  /**
+   * Starting position in the stream observer writes to
+   * @var int
+   */
+  private $_startPosition = 0;
 
-    /**
-     * Maximum bytes to write
-     * @var int|null
-     */
-    private $_maxDownloadSize;
+  /**
+   * Maximum bytes to write
+   * @var int|null
+   */
+  private $_maxDownloadSize;
 
-    /**
-     * Whether response being received is a redirect
-     * @var bool
-     */
-    private $_redirect = false;
+  /**
+   * Whether response being received is a redirect
+   * @var bool
+   */
+  private $_redirect = false;
 
-    /**
-     * Accumulated body chunks that may contain (gzip) header
-     * @var string
-     */
-    private $_possibleHeader = '';
+  /**
+   * Accumulated body chunks that may contain (gzip) header
+   * @var string
+   */
+  private $_possibleHeader = '';
 
-    /**
-     * Class constructor
-     *
-     * Note that there might be problems with max_bytes and files bigger
-     * than 2 GB on 32bit platforms
-     *
-     * @param resource $stream          a stream (or file descriptor) opened for writing.
-     * @param int      $maxDownloadSize maximum bytes to write
-     */
-    public function __construct($stream, $maxDownloadSize = null)
-    {
-        $this->_stream = $stream;
-        if ($maxDownloadSize) {
-            $this->_maxDownloadSize = $maxDownloadSize;
-            $this->_startPosition   = ftell($this->_stream);
-        }
+  /**
+   * Class constructor
+   *
+   * Note that there might be problems with max_bytes and files bigger
+   * than 2 GB on 32bit platforms
+   *
+   * @param resource $stream          a stream (or file descriptor) opened for writing.
+   * @param int      $maxDownloadSize maximum bytes to write
+   */
+  public function __construct($stream, $maxDownloadSize = null)
+  {
+    $this->_stream = $stream;
+    if ($maxDownloadSize) {
+      $this->_maxDownloadSize = $maxDownloadSize;
+      $this->_startPosition = ftell($this->_stream);
     }
+  }
 
-    /**
-     * Called when the request notifies us of an event.
-     *
-     * @param SplSubject $request The HTTP_Request2 instance
-     *
-     * @return void
-     * @throws HTTP_Request2_MessageException
-     */
-    public function update(SplSubject $request)
-    {
-        /* @var $request HTTP_Request2 */
-        $event   = $request->getLastEvent();
-        $encoded = false;
+  /**
+   * Called when the request notifies us of an event.
+   *
+   * @param SplSubject $request The HTTP_Request2 instance
+   *
+   * @return void
+   * @throws HTTP_Request2_MessageException
+   */
+  public function update(SplSubject $request)
+  {
+    /* @var $request HTTP_Request2 */
+    $event = $request->getLastEvent();
+    $encoded = false;
 
-        /* @var $event['data'] HTTP_Request2_Response */
-        switch ($event['name']) {
-        case 'receivedHeaders':
-            $this->_processingHeader = true;
-            $this->_redirect = $event['data']->isRedirect();
-            $this->_encoding = strtolower($event['data']->getHeader('content-encoding'));
-            $this->_possibleHeader = '';
-            break;
+    /* @var $event['data'] HTTP_Request2_Response */
+    switch ($event['name']) {
+      case 'receivedHeaders':
+        $this->_processingHeader = true;
+        $this->_redirect = $event['data']->isRedirect();
+        $this->_encoding = strtolower(
+          $event['data']->getHeader('content-encoding')
+        );
+        $this->_possibleHeader = '';
+        break;
 
-        case 'receivedEncodedBodyPart':
-            if (!$this->_streamFilter
-                && ($this->_encoding === 'deflate' || $this->_encoding === 'gzip')
-            ) {
-                $this->_streamFilter = stream_filter_append(
-                    $this->_stream, 'zlib.inflate', STREAM_FILTER_WRITE
-                );
+      case 'receivedEncodedBodyPart':
+        if (
+          !$this->_streamFilter &&
+          ($this->_encoding === 'deflate' || $this->_encoding === 'gzip')
+        ) {
+          $this->_streamFilter = stream_filter_append(
+            $this->_stream,
+            'zlib.inflate',
+            STREAM_FILTER_WRITE
+          );
+        }
+        $encoded = true;
+      // fall-through is intentional
+
+      case 'receivedBodyPart':
+        if ($this->_redirect) {
+          break;
+        }
+
+        if (!$encoded || !$this->_processingHeader) {
+          $bytes = fwrite($this->_stream, $event['data']);
+        } else {
+          $offset = 0;
+          $this->_possibleHeader .= $event['data'];
+          if ('deflate' === $this->_encoding) {
+            if (2 > strlen($this->_possibleHeader)) {
+              break;
             }
-            $encoded = true;
-            // fall-through is intentional
-
-        case 'receivedBodyPart':
-            if ($this->_redirect) {
+            $header = unpack('n', substr($this->_possibleHeader, 0, 2));
+            if (0 == $header[1] % 31) {
+              $offset = 2;
+            }
+          } elseif ('gzip' === $this->_encoding) {
+            if (10 > strlen($this->_possibleHeader)) {
+              break;
+            }
+            try {
+              $offset = HTTP_Request2_Response::parseGzipHeader(
+                $this->_possibleHeader,
+                false
+              );
+            } catch (HTTP_Request2_MessageException $e) {
+              // need more data?
+              if (false !== strpos($e->getMessage(), 'data too short')) {
                 break;
+              }
+              throw $e;
             }
+          }
 
-            if (!$encoded || !$this->_processingHeader) {
-                $bytes = fwrite($this->_stream, $event['data']);
-
-            } else {
-                $offset = 0;
-                $this->_possibleHeader .= $event['data'];
-                if ('deflate' === $this->_encoding) {
-                    if (2 > strlen($this->_possibleHeader)) {
-                        break;
-                    }
-                    $header = unpack('n', substr($this->_possibleHeader, 0, 2));
-                    if (0 == $header[1] % 31) {
-                        $offset = 2;
-                    }
-
-                } elseif ('gzip' === $this->_encoding) {
-                    if (10 > strlen($this->_possibleHeader)) {
-                        break;
-                    }
-                    try {
-                        $offset = HTTP_Request2_Response::parseGzipHeader($this->_possibleHeader, false);
-
-                    } catch (HTTP_Request2_MessageException $e) {
-                        // need more data?
-                        if (false !== strpos($e->getMessage(), 'data too short')) {
-                            break;
-                        }
-                        throw $e;
-                    }
-                }
-
-                $this->_processingHeader = false;
-                $bytes = fwrite($this->_stream, substr($this->_possibleHeader, $offset));
-            }
-
-            if (false === $bytes) {
-                throw new HTTP_Request2_MessageException('fwrite failed.');
-            }
-
-            if ($this->_maxDownloadSize
-                && ftell($this->_stream) - $this->_startPosition > $this->_maxDownloadSize
-            ) {
-                throw new HTTP_Request2_MessageException(sprintf(
-                    'Body length limit (%d bytes) reached',
-                    $this->_maxDownloadSize
-                ));
-            }
-            break;
-
-        case 'receivedBody':
-            if ($this->_streamFilter) {
-                stream_filter_remove($this->_streamFilter);
-                $this->_streamFilter = null;
-            }
-            break;
+          $this->_processingHeader = false;
+          $bytes = fwrite(
+            $this->_stream,
+            substr($this->_possibleHeader, $offset)
+          );
         }
+
+        if (false === $bytes) {
+          throw new HTTP_Request2_MessageException('fwrite failed.');
+        }
+
+        if (
+          $this->_maxDownloadSize &&
+          ftell($this->_stream) - $this->_startPosition >
+            $this->_maxDownloadSize
+        ) {
+          throw new HTTP_Request2_MessageException(
+            sprintf(
+              'Body length limit (%d bytes) reached',
+              $this->_maxDownloadSize
+            )
+          );
+        }
+        break;
+
+      case 'receivedBody':
+        if ($this->_streamFilter) {
+          stream_filter_remove($this->_streamFilter);
+          $this->_streamFilter = null;
+        }
+        break;
     }
+  }
 }

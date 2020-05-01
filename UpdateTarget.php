@@ -4,56 +4,66 @@ require_once 'SignatureBuilder.php';
 
 new UpdateTarget($_GET["targetId"], $_GET["metadata"]);
 
-class UpdateTarget{
-	private $access_key = "79555486c9a2a4a421f47fe4dcada9ede670c9bc";
-	private $secret_key = "b84d1921cbf5c3de85434ad6a1c13531ee107b9b";
+class UpdateTarget
+{
+  private $access_key = "79555486c9a2a4a421f47fe4dcada9ede670c9bc";
+  private $secret_key = "b84d1921cbf5c3de85434ad6a1c13531ee107b9b";
 
-	private $url = "https://vws.vuforia.com";
-	private $requestPath = "/targets/";
-	private $request;
-	private $jsonBody = "";
-	
-	function __construct($targetId, $metadata){
-		$this->requestPath = $this->requestPath . $this->targetId;
-		
-		$this->jsonBody = json_encode( 
-			array( 
-				'application_metadata' => base64_encode("https://d28xe8vt774jo5.cloudfront.net/champion-abilities/0064/ability_0064_R1.webm")
-			)
-		);
+  private $url = "https://vws.vuforia.com";
+  private $requestPath = "/targets/";
+  private $request;
+  private $jsonBody = "";
 
-		$this->execUpdateTarget();
-	}
+  function __construct($targetId, $metadata)
+  {
+    $this->requestPath = $this->requestPath . $this->targetId;
 
-	public function execUpdateTarget(){
-		$this->request = new HTTP_Request2();
-		$this->request->setMethod( HTTP_Request2::METHOD_PUT );
-		$this->request->setBody( $this->jsonBody );
+    $this->jsonBody = json_encode([
+      'application_metadata' => base64_encode(
+        "https://d28xe8vt774jo5.cloudfront.net/champion-abilities/0064/ability_0064_R1.webm"
+      ),
+    ]);
 
-		$this->request->setConfig(array(
-			'ssl_verify_peer' => false
-		));
+    $this->execUpdateTarget();
+  }
 
-		$this->request->setURL( $this->url . $this->requestPath );
+  public function execUpdateTarget()
+  {
+    $this->request = new HTTP_Request2();
+    $this->request->setMethod(HTTP_Request2::METHOD_PUT);
+    $this->request->setBody($this->jsonBody);
 
-		$this->setHeaders();
+    $this->request->setConfig([
+      'ssl_verify_peer' => false,
+    ]);
 
-		try {
-			$response = $this->request->send();
+    $this->request->setURL($this->url . $this->requestPath);
 
-			echo $response->getBody();
-		} catch (HTTP_Request2_Exception $e) {
-			echo 'Error: ' . $e->getMessage();
-		}
-	}
+    $this->setHeaders();
 
-	private function setHeaders(){
-		$sb = 	new SignatureBuilder();
-		$date = new DateTime("now", new DateTimeZone("GMT"));
+    try {
+      $response = $this->request->send();
 
-		$this->request->setHeader('Date', $date->format("D, d M Y H:i:s") . " GMT" );
-		$this->request->setHeader("Content-Type", "application/json" );
-		$this->request->setHeader("Authorization" , "VWS " . $this->access_key . ":" . $sb->tmsSignature( $this->request , $this->secret_key ));
-	}
+      echo $response->getBody();
+    } catch (HTTP_Request2_Exception $e) {
+      echo 'Error: ' . $e->getMessage();
+    }
+  }
+
+  private function setHeaders()
+  {
+    $sb = new SignatureBuilder();
+    $date = new DateTime("now", new DateTimeZone("GMT"));
+
+    $this->request->setHeader('Date', $date->format("D, d M Y H:i:s") . " GMT");
+    $this->request->setHeader("Content-Type", "application/json");
+    $this->request->setHeader(
+      "Authorization",
+      "VWS " .
+        $this->access_key .
+        ":" .
+        $sb->tmsSignature($this->request, $this->secret_key)
+    );
+  }
 }
 ?>
