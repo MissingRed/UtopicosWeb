@@ -2,7 +2,7 @@
 require_once 'HTTP/Request2.php';
 require_once 'SignatureBuilder.php';
 
-new UpdateTarget($_GET["id"], $_GET["metadata"]);
+new UpdateTarget($_GET["targetId"], $_GET["metadata"]);
 
 class UpdateTarget{
 	private $access_key = "79555486c9a2a4a421f47fe4dcada9ede670c9bc";
@@ -18,7 +18,7 @@ class UpdateTarget{
 		
 		$this->jsonBody = json_encode( 
 			array( 
-				'application_metadata' => base64_encode($metadata)
+				'application_metadata' => base64_encode("https://d28xe8vt774jo5.cloudfront.net/champion-abilities/0064/ability_0064_R1.webm")
 			)
 		);
 

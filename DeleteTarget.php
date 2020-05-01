@@ -2,7 +2,7 @@
 require_once 'HTTP/Request2.php';
 require_once 'SignatureBuilder.php';
 
-new DeleteTarget($_GET["targetId"]);
+new DeleteTarget($_GET["targetId"], $_GET["targetName"]);
 
 class DeleteTarget{
 	private $access_key = "79555486c9a2a4a421f47fe4dcada9ede670c9bc";
@@ -12,12 +12,12 @@ class DeleteTarget{
 	private $requestPath = "/targets/";
 	private $request;
 	
-	function __construct($targetId){
+	function __construct($targetId, $targetName){
 		$this->requestPath = $this->requestPath . $targetId;
-		$this->execDeleteTarget();
+		$this->execDeleteTarget($targetName);
 	}
 
-	private function execDeleteTarget(){
+	private function execDeleteTarget($targetName){
 		$this->request = new HTTP_Request2();
 		$this->request->setMethod( HTTP_Request2::METHOD_DELETE );
 		
@@ -32,7 +32,9 @@ class DeleteTarget{
 		try {
 			$response = $this->request->send();
 
-			$response->getBody();
+			if (200 == $response->getStatus() && file_exists($targetName. ".jpg")) unlink($targetName. ".jpg");
+
+			echo $response->getBody();
 		} catch (HTTP_Request2_Exception $e) {
 			echo 'Error: ' . $e->getMessage();
 		}

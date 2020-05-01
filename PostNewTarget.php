@@ -1,8 +1,11 @@
 <?php
 require_once 'HTTP/Request2.php';
 require_once 'SignatureBuilder.php';
+require_once 'UploadTargets.php';
 
-new PostNewTarget($_GET["targetName"], $_get["imageLocation"], $_GET["metadata"]);
+new UploadTargets($_FILES["fileToUpload"]["tmp_name"], $_POST["targetName"]);
+
+new PostNewTarget($_POST["targetName"], $_POST["metadata"]);
 
 class PostNewTarget{
 	private $access_key = "79555486c9a2a4a421f47fe4dcada9ede670c9bc";
@@ -13,13 +16,14 @@ class PostNewTarget{
 	private $request;
 	private $jsonRequestObject;
 	
-	function PostNewTarget($targetName, $imageLocation, $metadata){
+	function __construct ($targetName, $metadata){
+		$imageLocation = $targetName. ".jpg";
 		$this->jsonRequestObject = json_encode( 
 			array( 
 				'width' => 320.0, 
 				'name' => $targetName,
 				'image' => $this->getImageAsBase64($imageLocation),
-				'application_metadata' => base64_encode($metadata),
+				'application_metadata' => base64_encode("https://d28xe8vt774jo5.cloudfront.net/champion-abilities/0064/ability_0064_R1.webm"),
 				'active_flag' => 1 
 			)
 		);
