@@ -10,7 +10,7 @@ new UploadTargets(
   $_POST["type"]
 );
 
-//new PostNewTarget($_POST["targetName"], $_POST["type"]);
+new PostNewTarget($_POST["targetName"], $_POST["type"]);
 
 class PostNewTarget
 {
@@ -37,10 +37,11 @@ class PostNewTarget
       'name' => $targetName,
       'image' => $this->getImageAsBase64($imageLocation),
       'application_metadata' => base64_encode(
-        file_get_contents($_FILES["metadata"]["tmp_name"])
+        "http://danielrf.com/api_vuforia/" . $metadataLocation
       ),
       'active_flag' => 1,
     ]);
+
     $this->execPostNewTarget($imageLocation);
   }
 
