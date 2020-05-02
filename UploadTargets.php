@@ -1,15 +1,21 @@
 <?php
 class UploadTargets
 {
-  function __construct($img, $targetName)
+  function __construct($img, $targetName, $tipo)
   {
-    $targetName = $targetName . ".jpg";
-    if (
-      $this->isFake($img) &&
-      $this->exist(
-        $targetName
-      ) /*&& $this->checkSize($img) && $this->checkType($img)*/
-    ) {
+    if ($tipo != "1") {
+      $targetName = $targetName . ".jpg";
+
+      if (
+        $this->isFake($img) &&
+        $this->exist(
+          $targetName
+        ) /*&& $this->checkSize($img) && $this->checkType($img)*/
+      ) {
+        file_put_contents($targetName, file_get_contents($img));
+      }
+    } else {
+      $targetName = $targetName . ".mp4";
       file_put_contents($targetName, file_get_contents($img));
     }
   }

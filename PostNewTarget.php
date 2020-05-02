@@ -3,9 +3,14 @@ require_once 'HTTP/Request2.php';
 require_once 'SignatureBuilder.php';
 require_once 'UploadTargets.php';
 
-new UploadTargets($_FILES["fileToUpload"]["tmp_name"], $_POST["targetName"]);
+new UploadTargets($_FILES["fileToUpload"]["tmp_name"], $_POST["targetName"], 0);
+new UploadTargets(
+  $_FILES["metadata"]["tmp_name"],
+  $_POST["targetName"],
+  $_POST["type"]
+);
 
-new PostNewTarget($_POST["targetName"], $_POST["metadata"]);
+//new PostNewTarget($_POST["targetName"], $_POST["type"]);
 
 class PostNewTarget
 {
@@ -17,19 +22,37 @@ class PostNewTarget
   private $request;
   private $jsonRequestObject;
 
-  function __construct($targetName, $metadata)
+  function __construct($targetName, $type)
   {
     $imageLocation = $targetName . ".jpg";
+
+    if ($type == 1) {
+      $metadataLocation = $targetName . ".mp4";
+    } elseif ($type == 2) {
+      $metadataLocation = $targetName . ".jpg";
+    }
+
     $this->jsonRequestObject = json_encode([
       'width' => 320.0,
       'name' => $targetName,
       'image' => $this->getImageAsBase64($imageLocation),
       'application_metadata' => base64_encode(
-        "https://d28xe8vt774jo5.cloudfront.net/champion-abilities/0064/ability_0064_R1.webm"
+        file_get_contents($_FILES["metadata"]["tmp_name"])
       ),
       'active_flag' => 1,
     ]);
     $this->execPostNewTarget($imageLocation);
+  }
+
+  function getMetadataAsBase64($metadataLocation)
+  {
+    $file = file_get_contents($metadataLocation);
+
+    if ($file) {
+      $file = base64_encode($file);
+    }
+
+    return $file;
   }
 
   function getImageAsBase64($imageLocation)
