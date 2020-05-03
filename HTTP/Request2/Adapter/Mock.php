@@ -49,118 +49,117 @@ require_once 'HTTP/Request2/Adapter.php';
  */
 class HTTP_Request2_Adapter_Mock extends HTTP_Request2_Adapter
 {
-    /**
-     * A queue of responses to be returned by sendRequest()
-     * @var  array
-     */
-    protected $responses = array();
+  /**
+   * A queue of responses to be returned by sendRequest()
+   * @var  array
+   */
+  protected $responses = [];
 
-    /**
-     * Returns the next response from the queue built by addResponse()
-     *
-     * Only responses without explicit URLs or with URLs equal to request URL
-     * will be considered. If matching response is not found or the queue is
-     * empty then default empty response with status 400 will be returned,
-     * if an Exception object was added to the queue it will be thrown.
-     *
-     * @param HTTP_Request2 $request HTTP request message
-     *
-     * @return   HTTP_Request2_Response
-     * @throws   Exception
-     */
-    public function sendRequest(HTTP_Request2 $request)
-    {
-        $requestUrl = (string)$request->getUrl();
-        $response   = null;
-        foreach ($this->responses as $k => $v) {
-            if (!$v[1] || $requestUrl == $v[1]) {
-                $response = $v[0];
-                array_splice($this->responses, $k, 1);
-                break;
-            }
-        }
-        if (!$response) {
-            return self::createResponseFromString("HTTP/1.1 400 Bad Request\r\n\r\n");
-
-        } elseif ($response instanceof HTTP_Request2_Response) {
-            return $response;
-
-        } else {
-            // rethrow the exception
-            $class   = get_class($response);
-            $message = $response->getMessage();
-            $code    = $response->getCode();
-            throw new $class($message, $code);
-        }
+  /**
+   * Returns the next response from the queue built by addResponse()
+   *
+   * Only responses without explicit URLs or with URLs equal to request URL
+   * will be considered. If matching response is not found or the queue is
+   * empty then default empty response with status 400 will be returned,
+   * if an Exception object was added to the queue it will be thrown.
+   *
+   * @param HTTP_Request2 $request HTTP request message
+   *
+   * @return   HTTP_Request2_Response
+   * @throws   Exception
+   */
+  public function sendRequest(HTTP_Request2 $request)
+  {
+    $requestUrl = (string) $request->getUrl();
+    $response = null;
+    foreach ($this->responses as $k => $v) {
+      if (!$v[1] || $requestUrl == $v[1]) {
+        $response = $v[0];
+        array_splice($this->responses, $k, 1);
+        break;
+      }
     }
-
-    /**
-     * Adds response to the queue
-     *
-     * @param mixed  $response either a string, a pointer to an open file,
-     *                         an instance of HTTP_Request2_Response or Exception
-     * @param string $url      A request URL this response should be valid for
-     *                         (see {@link http://pear.php.net/bugs/bug.php?id=19276})
-     *
-     * @throws   HTTP_Request2_Exception
-     */
-    public function addResponse($response, $url = null)
-    {
-        if (is_string($response)) {
-            $response = self::createResponseFromString($response);
-        } elseif (is_resource($response)) {
-            $response = self::createResponseFromFile($response);
-        } elseif (!$response instanceof HTTP_Request2_Response &&
-                  !$response instanceof Exception
-        ) {
-            throw new HTTP_Request2_Exception('Parameter is not a valid response');
-        }
-        $this->responses[] = array($response, $url);
+    if (!$response) {
+      return self::createResponseFromString("HTTP/1.1 400 Bad Request\r\n\r\n");
+    } elseif ($response instanceof HTTP_Request2_Response) {
+      return $response;
+    } else {
+      // rethrow the exception
+      $class = get_class($response);
+      $message = $response->getMessage();
+      $code = $response->getCode();
+      throw new $class($message, $code);
     }
+  }
 
-    /**
-     * Creates a new HTTP_Request2_Response object from a string
-     *
-     * @param string $str string containing HTTP response message
-     *
-     * @return   HTTP_Request2_Response
-     * @throws   HTTP_Request2_Exception
-     */
-    public static function createResponseFromString($str)
-    {
-        $parts       = preg_split('!(\r?\n){2}!m', $str, 2);
-        $headerLines = explode("\n", $parts[0]);
-        $response    = new HTTP_Request2_Response(array_shift($headerLines));
-        foreach ($headerLines as $headerLine) {
-            $response->parseHeaderLine($headerLine);
-        }
-        $response->parseHeaderLine('');
-        if (isset($parts[1])) {
-            $response->appendBody($parts[1]);
-        }
-        return $response;
+  /**
+   * Adds response to the queue
+   *
+   * @param mixed  $response either a string, a pointer to an open file,
+   *                         an instance of HTTP_Request2_Response or Exception
+   * @param string $url      A request URL this response should be valid for
+   *                         (see {@link http://pear.php.net/bugs/bug.php?id=19276})
+   *
+   * @throws   HTTP_Request2_Exception
+   */
+  public function addResponse($response, $url = null)
+  {
+    if (is_string($response)) {
+      $response = self::createResponseFromString($response);
+    } elseif (is_resource($response)) {
+      $response = self::createResponseFromFile($response);
+    } elseif (
+      !$response instanceof HTTP_Request2_Response &&
+      !$response instanceof Exception
+    ) {
+      throw new HTTP_Request2_Exception('Parameter is not a valid response');
     }
+    $this->responses[] = [$response, $url];
+  }
 
-    /**
-     * Creates a new HTTP_Request2_Response object from a file
-     *
-     * @param resource $fp file pointer returned by fopen()
-     *
-     * @return   HTTP_Request2_Response
-     * @throws   HTTP_Request2_Exception
-     */
-    public static function createResponseFromFile($fp)
-    {
-        $response = new HTTP_Request2_Response(fgets($fp));
-        do {
-            $headerLine = fgets($fp);
-            $response->parseHeaderLine($headerLine);
-        } while ('' != trim($headerLine));
-
-        while (!feof($fp)) {
-            $response->appendBody(fread($fp, 8192));
-        }
-        return $response;
+  /**
+   * Creates a new HTTP_Request2_Response object from a string
+   *
+   * @param string $str string containing HTTP response message
+   *
+   * @return   HTTP_Request2_Response
+   * @throws   HTTP_Request2_Exception
+   */
+  public static function createResponseFromString($str)
+  {
+    $parts = preg_split('!(\r?\n){2}!m', $str, 2);
+    $headerLines = explode("\n", $parts[0]);
+    $response = new HTTP_Request2_Response(array_shift($headerLines));
+    foreach ($headerLines as $headerLine) {
+      $response->parseHeaderLine($headerLine);
     }
+    $response->parseHeaderLine('');
+    if (isset($parts[1])) {
+      $response->appendBody($parts[1]);
+    }
+    return $response;
+  }
+
+  /**
+   * Creates a new HTTP_Request2_Response object from a file
+   *
+   * @param resource $fp file pointer returned by fopen()
+   *
+   * @return   HTTP_Request2_Response
+   * @throws   HTTP_Request2_Exception
+   */
+  public static function createResponseFromFile($fp)
+  {
+    $response = new HTTP_Request2_Response(fgets($fp));
+    do {
+      $headerLine = fgets($fp);
+      $response->parseHeaderLine($headerLine);
+    } while ('' != trim($headerLine));
+
+    while (!feof($fp)) {
+      $response->appendBody(fread($fp, 8192));
+    }
+    return $response;
+  }
 }
 ?>
