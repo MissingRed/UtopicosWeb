@@ -1,33 +1,29 @@
 <?php
-header('Access-Control-Allow-Origin: *');
-header(
-  "Access-Control-Allow-Headers: X-API-KEY, Origin, X-Requested-With, Content-Type, Accept, Access-Control-Request-Method"
-);
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
-header("Allow: GET, POST, OPTIONS, PUT, DELETE");
-
 require_once 'HTTP/Request2.php';
 require_once 'SignatureBuilder.php';
-require_once 'Get.php';
 
-new GetAllTargets();
-
-class GetAllTargets
+class Get
 {
   private $access_key = "872193617f52547044d05e2ccf372c29cc65ed1b";
   private $secret_key = "4d5f0c38a2322404f163f9ab6dc9b1b82525986d";
 
   private $url = "https://vws.vuforia.com";
-  private $requestPath = "/targets";
+  private $requestPath = "/targets/";
   private $request;
+  private $datos;
 
-  function __construct()
+  function __construct($targetId)
   {
-    $this->requestPath = $this->requestPath;
-    $this->execGetAllTargets();
+    $this->requestPath = $this->requestPath . $targetId;
+    $this->execGetTarget();
   }
 
-  private function execGetAllTargets()
+  function getDato()
+  {
+    return $this->datos;
+  }
+
+  private function execGetTarget()
   {
     $this->request = new HTTP_Request2();
     $this->request->setMethod(HTTP_Request2::METHOD_GET);
@@ -43,25 +39,7 @@ class GetAllTargets
     try {
       $response = $this->request->send();
 
-      $aux = json_decode($response->getBody());
-
-      $cant = count($aux->results);
-      $cont = 0;
-
-      echo "[";
-
-      foreach ($aux->results as $result) {
-        $instancia = new Get($result);
-
-        echo $instancia->getDato();
-
-        if ($cont < $cant - 1) {
-          echo ",";
-          $cont++;
-        }
-      }
-
-      echo "]";
+      $this->datos = $response->getBody();
     } catch (HTTP_Request2_Exception $e) {
       echo 'Error: ' . $e->getMessage();
     }

@@ -42,9 +42,14 @@ class DeleteTarget
     try {
       $response = $this->request->send();
 
-      if (200 == $response->getStatus() && file_exists($targetName . ".jpg")) {
-        unlink($targetName . ".jpg");
-        unlink($targetName . ".mp4");
+      if (200 == $response->getStatus()) {
+        if (file_exists($targetName . ".jpg")) {
+          unlink($targetName . ".jpg");
+        }
+
+        if (file_exists($targetName . ".mp4")) {
+          unlink($targetName . ".mp4");
+        }
       }
 
       echo $response->getBody();
